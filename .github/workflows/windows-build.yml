@@ -11,8 +11,18 @@ jobs:
   build-windows:
     runs-on: windows-latest
 
+    env:
+      # 缩短 cargo 路径，避免 Windows 上路径过长
+      CARGO_HOME: C:\cargo
+      CARGO_TARGET_DIR: C:\target
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Enable long paths support
+        run: |
+          git config --system core.longpaths true
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -34,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zed-windows-release
-          path: target/release/*
+          path: C:\target\release\*
 
       - name: Create GitHub Release
         if: github.event_name == 'push' || github.event_name == 'schedule'
@@ -42,6 +52,6 @@ jobs:
         with:
           tag: nightly-${{ github.run_number }}
           name: "Zed Windows Build #${{ github.run_number }}"
-          artifacts: "target/release/*"
+          artifacts: "C:/target/release/*"
           token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true   # 如果 tag 已存在，允许覆盖
+          allowUpdates: true
