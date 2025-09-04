@@ -5,15 +5,11 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 0 * * *'  # UTC 每天 00:00 定期触发构建
+    - cron: '0 0 * * *'  # 每天 UTC 00:00 构建一次
 
 jobs:
   build-windows:
     runs-on: windows-latest
-
-    env:
-      # 避免 RUSTFLAGS 干扰，也可在 Cargo config 中处理
-      RUSTFLAGS: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -25,39 +21,27 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Set up Rust targets
+      - name: Add Windows target
         run: rustup target add x86_64-pc-windows-msvc
 
-      - name: Install Visual C++ Redistributable (optional)
-        run: choco install vcredist2022 -y
-
-      - name: Ensure long path support (optional)
-        run: |
-          git config --system core.longpaths true
-          reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
-
-      - name: Set ZED_RC_TOOLKIT_PATH (if needed)
-        run: |
-          echo "ZED_RC_TOOLKIT_PATH=C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.22449.0\\x64" >> $GITHUB_ENV
-
       - name: Build (Release)
-        run: cargo run --release
+        run: cargo build --release
 
       - name: Run tests
         run: cargo test --workspace
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: zed-windows-release
-          path: target\release\*
+          path: target/release/*
 
-      - name: Create GitHub Release (on schedule or push)
+      - name: Create GitHub Release
         if: github.event_name == 'push' || github.event_name == 'schedule'
-        uses: softprops/action-gh-release@v1
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ github.sha }}
-          name: "Zed Windows Build ${{ github.run_number }}"
-          files: target\release\*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: nightly-${{ github.run_number }}
+          name: "Zed Windows Build #${{ github.run_number }}"
+          artifacts: "target/release/*"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true   # 如果 tag 已存在，允许覆盖
